@@ -1,0 +1,144 @@
+{
+  "id": "290d487a-00a1-4157-8ed7-2e50c859d0db",
+  "revision": 0,
+  "last_node_id": 3,
+  "last_link_id": 2,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "Qwen3Loader",
+      "pos": [
+        100,
+        130
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "QWEN3_MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Qwen3Loader"
+      },
+      "widgets_values": [
+        "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+        "HuggingFace",
+        "bf16",
+        "auto"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "Qwen3CustomVoice",
+      "pos": [
+        470,
+        130
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "QWEN3_MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Qwen3CustomVoice"
+      },
+      "widgets_values": [
+        "Hello, this is just a simple test honestly. I'll be working on improving the nodes soon...",
+        "Auto",
+        "Ryan",
+        ""
+      ]
+    },
+    {
+      "id": 3,
+      "type": "PreviewAudio",
+      "pos": [
+        970,
+        130
+      ],
+      "size": [
+        270,
+        88
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 2
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.10.0",
+        "Node name for S&R": "PreviewAudio"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "QWEN3_MODEL"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "workflowRendererVersion": "LG",
+    "ue_links": [],
+    "ds": {
+      "scale": 1.128526645768025,
+      "offset": [
+        98.31391666666612,
+        190.80022222222232
+      ]
+    },
+    "frontendVersion": "1.37.11"
+  },
+  "version": 0.4
+}
