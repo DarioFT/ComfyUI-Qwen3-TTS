@@ -18,7 +18,7 @@ A ComfyUI custom node suite for [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS)
 1.  Clone this repository into your `ComfyUI/custom_nodes` folder:
     ```bash
     cd ComfyUI/custom_nodes
-    git clone https://github.com/your-username/ComfyUI-Qwen3-TTS.git
+    git clone https://github.com/DarioFT/ComfyUI-Qwen3-TTS.git
     ```
 2.  Install dependencies:
     ```bash
