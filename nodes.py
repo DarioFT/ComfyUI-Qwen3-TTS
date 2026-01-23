@@ -100,7 +100,12 @@ class Qwen3Loader:
         
         dtype = torch.float32
         if precision == "bf16":
-            dtype = torch.bfloat16
+            # MPS has limited bf16 support; fall back to fp16 on Mac
+            if device.type == "mps":
+                dtype = torch.float16
+                print("Note: Using fp16 on MPS (bf16 has limited support)")
+            else:
+                dtype = torch.bfloat16
         elif precision == "fp16":
             dtype = torch.float16
             
