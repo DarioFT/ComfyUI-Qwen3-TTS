@@ -13,7 +13,7 @@
       ],
       "size": [
         270,
-        130
+        154
       ],
       "flags": {},
       "order": 0,
@@ -29,52 +29,15 @@
         }
       ],
       "properties": {
+        "cnr_id": "comfyui-qwen3-tts",
+        "ver": "6289ee949a75455e9fe1f90ac6d5f51445f03c73",
         "Node name for S&R": "Qwen3Loader"
       },
       "widgets_values": [
         "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
         "HuggingFace",
         "bf16",
-        "auto"
-      ]
-    },
-    {
-      "id": 2,
-      "type": "Qwen3CustomVoice",
-      "pos": [
-        470,
-        130
-      ],
-      "size": [
-        400,
-        200
-      ],
-      "flags": {},
-      "order": 1,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "model",
-          "type": "QWEN3_MODEL",
-          "link": 1
-        }
-      ],
-      "outputs": [
-        {
-          "name": "AUDIO",
-          "type": "AUDIO",
-          "links": [
-            2
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "Qwen3CustomVoice"
-      },
-      "widgets_values": [
-        "Hello, this is just a simple test honestly. I'll be working on improving the nodes soon...",
-        "Auto",
-        "Ryan",
+        "auto",
         ""
       ]
     },
@@ -106,6 +69,51 @@
         "Node name for S&R": "PreviewAudio"
       },
       "widgets_values": []
+    },
+    {
+      "id": 2,
+      "type": "Qwen3CustomVoice",
+      "pos": [
+        470,
+        130
+      ],
+      "size": [
+        400,
+        262
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "QWEN3_MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-qwen3-tts",
+        "ver": "6289ee949a75455e9fe1f90ac6d5f51445f03c73",
+        "Node name for S&R": "Qwen3CustomVoice"
+      },
+      "widgets_values": [
+        "A series of powerful speech generation capabilities developed by Qwen, offering comprehensive support for voice clone.",
+        "Auto",
+        "Ryan",
+        42,
+        "fixed",
+        "",
+        ""
+      ]
     }
   ],
   "links": [

@@ -217,18 +217,26 @@ class Qwen3CustomVoice:
                     "Vivian", "Serena", "Uncle_Fu", "Dylan", "Eric", 
                     "Ryan", "Aiden", "Ono_Anna", "Sohee"
                 ], {"default": "Vivian"}),
+                "seed": ("INT", {"default": 42, "min": 1, "max": 0xffffffffffffffff}),
             },
             "optional": {
                 "instruct": ("STRING", {"multiline": True, "default": ""}),
                 "custom_speaker_name": ("STRING", {"default": ""}),
             }
         }
+    
+    @classmethod
+    def IS_CHANGED(s, model, text, language, speaker, seed, instruct="", custom_speaker_name=""):
+        return seed
 
     RETURN_TYPES = ("AUDIO",)
     FUNCTION = "generate"
     CATEGORY = "Qwen3-TTS"
 
-    def generate(self, model, text, language, speaker, instruct="", custom_speaker_name=""):
+    def generate(self, model, text, language, speaker, seed, instruct="", custom_speaker_name=""):
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
         lang = language if language != "Auto" else None
         inst = instruct if instruct.strip() != "" else None
         
@@ -286,14 +294,22 @@ class Qwen3VoiceDesign:
                     "Auto", "Chinese", "English", "Japanese", "Korean", "German", 
                     "French", "Russian", "Portuguese", "Spanish", "Italian"
                 ], {"default": "Auto"}),
+                "seed": ("INT", {"default": 42, "min": 1, "max": 0xffffffffffffffff}),
             }
         }
+    
+    @classmethod
+    def IS_CHANGED(s, model, text, instruct, language, seed):
+        return seed
 
     RETURN_TYPES = ("AUDIO",)
     FUNCTION = "generate"
     CATEGORY = "Qwen3-TTS"
 
-    def generate(self, model, text, instruct, language):
+    def generate(self, model, text, instruct, language, seed):
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
         lang = language if language != "Auto" else None
         
         try:
@@ -352,6 +368,7 @@ class Qwen3VoiceClone:
             "required": {
                 "model": ("QWEN3_MODEL",),
                 "text": ("STRING", {"multiline": True}),
+                "seed": ("INT", {"default": 42, "min": 1, "max": 0xffffffffffffffff}),
             },
             "optional": {
                 "language": ([
@@ -363,12 +380,19 @@ class Qwen3VoiceClone:
                 "prompt": ("QWEN3_PROMPT",),
             }
         }
+    
+    @classmethod
+    def IS_CHANGED(s, model, text, seed, language="Auto", ref_audio=None, ref_text=None, prompt=None):
+        return seed
 
     RETURN_TYPES = ("AUDIO",)
     FUNCTION = "generate"
     CATEGORY = "Qwen3-TTS"
 
-    def generate(self, model, text, language="Auto", ref_audio=None, ref_text=None, prompt=None):
+    def generate(self, model, text, seed, language="Auto", ref_audio=None, ref_text=None, prompt=None):
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
         lang = language if language != "Auto" else None
         
         wavs = None

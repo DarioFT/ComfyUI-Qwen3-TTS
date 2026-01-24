@@ -179,6 +179,35 @@
       ]
     },
     {
+      "id": 6,
+      "type": "PreviewAudio",
+      "pos": [
+        1569.5197595792638,
+        407.0460692575642
+      ],
+      "size": [
+        270,
+        88
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 5
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.10.0",
+        "Node name for S&R": "PreviewAudio"
+      },
+      "widgets_values": []
+    },
+    {
       "id": 5,
       "type": "Qwen3CustomVoice",
       "pos": [
@@ -187,7 +216,7 @@
       ],
       "size": [
         400,
-        214
+        262
       ],
       "flags": {},
       "order": 4,
@@ -217,38 +246,11 @@
         "A series of powerful speech generation capabilities developed by Qwen, offering comprehensive support for voice clone.",
         "Auto",
         "Vivian",
+        42,
+        "fixed",
         "",
         "my_speaker"
       ]
-    },
-    {
-      "id": 6,
-      "type": "PreviewAudio",
-      "pos": [
-        1569.5197595792638,
-        407.0460692575642
-      ],
-      "size": [
-        270,
-        88
-      ],
-      "flags": {},
-      "order": 5,
-      "mode": 0,
-      "inputs": [
-        {
-          "name": "audio",
-          "type": "AUDIO",
-          "link": 5
-        }
-      ],
-      "outputs": [],
-      "properties": {
-        "cnr_id": "comfy-core",
-        "ver": "0.10.0",
-        "Node name for S&R": "PreviewAudio"
-      },
-      "widgets_values": []
     }
   ],
   "links": [
@@ -301,8 +303,8 @@
     "ds": {
       "scale": 0.9090909090909091,
       "offset": [
-        -188.81975957926394,
-        148.15393074243588
+        -305.83794139744566,
+        70.9266580151633
       ]
     },
     "frontendVersion": "1.37.11"
