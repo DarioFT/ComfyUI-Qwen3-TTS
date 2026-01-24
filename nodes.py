@@ -15,6 +15,91 @@ from transformers import AutoConfig
 from transformers.utils import cached_file
 from safetensors.torch import save_file
 
+# Register Qwen3-TTS models folder with ComfyUI
+QWEN3_TTS_MODELS_DIR = os.path.join(folder_paths.models_dir, "Qwen3-TTS")
+os.makedirs(QWEN3_TTS_MODELS_DIR, exist_ok=True)
+folder_paths.add_model_folder_path("Qwen3-TTS", QWEN3_TTS_MODELS_DIR)
+
+# Model repo mappings
+QWEN3_TTS_MODELS = {
+    "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice": "Qwen3-TTS-12Hz-1.7B-CustomVoice",
+    "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign": "Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+    "Qwen/Qwen3-TTS-12Hz-1.7B-Base": "Qwen3-TTS-12Hz-1.7B-Base",
+    "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice": "Qwen3-TTS-12Hz-0.6B-CustomVoice",
+    "Qwen/Qwen3-TTS-12Hz-0.6B-Base": "Qwen3-TTS-12Hz-0.6B-Base",
+}
+
+# Tokenizer repo mapping
+QWEN3_TTS_TOKENIZERS = {
+    "Qwen/Qwen3-TTS-Tokenizer-12Hz": "Qwen3-TTS-Tokenizer-12Hz",
+}
+
+def get_local_model_path(repo_id: str) -> str:
+    """Get the local path for a model/tokenizer in ComfyUI's models folder."""
+    folder_name = QWEN3_TTS_MODELS.get(repo_id) or QWEN3_TTS_TOKENIZERS.get(repo_id) or repo_id.replace("/", "_")
+    return os.path.join(QWEN3_TTS_MODELS_DIR, folder_name)
+
+def migrate_cached_model(repo_id: str, target_path: str) -> bool:
+    """Check for model in HuggingFace/ModelScope cache and migrate to ComfyUI folder."""
+    if os.path.exists(target_path) and os.listdir(target_path):
+        return True  # Already exists in target
+    
+    # Check HuggingFace cache
+    hf_cache = os.path.join(os.path.expanduser("~"), ".cache", "huggingface", "hub")
+    hf_model_dir = os.path.join(hf_cache, f"models--{repo_id.replace('/', '--')}")
+    if os.path.exists(hf_model_dir):
+        snapshots_dir = os.path.join(hf_model_dir, "snapshots")
+        if os.path.exists(snapshots_dir):
+            snapshots = os.listdir(snapshots_dir)
+            if snapshots:
+                source = os.path.join(snapshots_dir, snapshots[0])
+                print(f"Migrating model from HuggingFace cache: {source} -> {target_path}")
+                shutil.copytree(source, target_path, dirs_exist_ok=True)
+                return True
+    
+    # Check ModelScope cache
+    ms_cache = os.path.join(os.path.expanduser("~"), ".cache", "modelscope", "hub")
+    ms_model_dir = os.path.join(ms_cache, repo_id.replace("/", os.sep))
+    if os.path.exists(ms_model_dir):
+        print(f"Migrating model from ModelScope cache: {ms_model_dir} -> {target_path}")
+        shutil.copytree(ms_model_dir, target_path, dirs_exist_ok=True)
+        return True
+    
+    return False
+
+def download_model_to_comfyui(repo_id: str, source: str) -> str:
+    """Download a model directly to ComfyUI's models folder."""
+    target_path = get_local_model_path(repo_id)
+    
+    # First check if we can migrate from cache
+    if migrate_cached_model(repo_id, target_path):
+        print(f"Model available at: {target_path}")
+        return target_path
+    
+    os.makedirs(target_path, exist_ok=True)
+    
+    if source == "ModelScope":
+        from modelscope import snapshot_download
+        print(f"Downloading {repo_id} from ModelScope to {target_path}...")
+        snapshot_download(repo_id, local_dir=target_path)
+    else:
+        from huggingface_hub import snapshot_download
+        print(f"Downloading {repo_id} from HuggingFace to {target_path}...")
+        snapshot_download(repo_id, local_dir=target_path)
+    
+    return target_path
+
+def get_available_models() -> list:
+    """Get list of available models (downloaded + all options)."""
+    available = []
+    for repo_id, folder_name in QWEN3_TTS_MODELS.items():
+        local_path = os.path.join(QWEN3_TTS_MODELS_DIR, folder_name)
+        if os.path.exists(local_path) and os.listdir(local_path):
+            available.append(f"✓ {repo_id}")
+        else:
+            available.append(repo_id)
+    return available
+
 # Helper to convert audio to ComfyUI format
 def convert_audio(wav, sr):
     # wav is (channels, samples) or just (samples)
@@ -74,13 +159,7 @@ class Qwen3Loader:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "repo_id": ([
-                    "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
-                    "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
-                    "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-                    "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-                    "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
-                ], {"default": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"}),
+                "repo_id": (list(QWEN3_TTS_MODELS.keys()), {"default": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"}),
                 "source": (["HuggingFace", "ModelScope"], {"default": "HuggingFace"}),
                 "precision": (["fp16", "bf16", "fp32"], {"default": "bf16"}),
                 "attention": (["auto", "flash_attention_2", "sdpa", "eager"], {"default": "auto"}),
@@ -109,17 +188,20 @@ class Qwen3Loader:
         elif precision == "fp16":
             dtype = torch.float16
             
-        model_path = repo_id
-        
+        # Determine model path
         if local_model_path and local_model_path.strip() != "":
             model_path = local_model_path.strip()
             print(f"Loading from local path: {model_path}")
-        elif source == "ModelScope":
-            from modelscope import snapshot_download
-            try:
-                model_path = snapshot_download(repo_id)
-            except Exception as e:
-                print(f"ModelScope download failed: {e}. Falling back to HF or local.")
+        else:
+            # Check if model exists in ComfyUI models folder, download if not
+            local_path = get_local_model_path(repo_id)
+            if os.path.exists(local_path) and os.listdir(local_path):
+                model_path = local_path
+                print(f"Loading from ComfyUI models folder: {model_path}")
+            else:
+                # Download only this specific model
+                print(f"Model not found locally. Downloading {repo_id}...")
+                model_path = download_model_to_comfyui(repo_id, source)
 
         print(f"Loading Qwen3-TTS model: {repo_id} from {model_path} on {device} as {dtype}")
         
@@ -529,7 +611,8 @@ class Qwen3DataPrep:
         return {
             "required": {
                 "jsonl_path": ("STRING", {"default": "", "multiline": False}),
-                "tokenizer_repo": ("STRING", {"default": "Qwen/Qwen3-TTS-Tokenizer-12Hz", "multiline": False}),
+                "tokenizer_repo": (list(QWEN3_TTS_TOKENIZERS.keys()), {"default": "Qwen/Qwen3-TTS-Tokenizer-12Hz"}),
+                "source": (["HuggingFace", "ModelScope"], {"default": "HuggingFace"}),
             }
         }
 
@@ -538,14 +621,22 @@ class Qwen3DataPrep:
     FUNCTION = "process"
     CATEGORY = "Qwen3-TTS/FineTuning"
 
-    def process(self, jsonl_path, tokenizer_repo):
+    def process(self, jsonl_path, tokenizer_repo, source):
         device = mm.get_torch_device()
         
         output_path = jsonl_path.replace(".jsonl", "_codes.jsonl")
         
-        print(f"Loading Tokenizer: {tokenizer_repo}")
+        # Resolve tokenizer path - check ComfyUI folder first, download if needed
+        local_path = get_local_model_path(tokenizer_repo)
+        if os.path.exists(local_path) and os.listdir(local_path):
+            tokenizer_path = local_path
+            print(f"Loading Tokenizer from ComfyUI folder: {tokenizer_path}")
+        else:
+            print(f"Tokenizer not found locally. Downloading {tokenizer_repo}...")
+            tokenizer_path = download_model_to_comfyui(tokenizer_repo, source)
+        
         tokenizer = Qwen3TTSTokenizer.from_pretrained(
-            tokenizer_repo,
+            tokenizer_path,
             device_map=device,
         )
         
@@ -586,10 +677,13 @@ class Qwen3DataPrep:
 class Qwen3FineTune:
     @classmethod
     def INPUT_TYPES(s):
+        # Get base models (excluding CustomVoice/VoiceDesign for fine-tuning)
+        base_models = [k for k in QWEN3_TTS_MODELS.keys() if "Base" in k]
         return {
             "required": {
                 "train_jsonl": ("STRING", {"default": "", "multiline": False}),
-                "init_model": ("STRING", {"default": "Qwen/Qwen3-TTS-12Hz-1.7B-Base", "multiline": False}),
+                "init_model": (base_models, {"default": "Qwen/Qwen3-TTS-12Hz-1.7B-Base"}),
+                "source": (["HuggingFace", "ModelScope"], {"default": "HuggingFace"}),
                 "output_dir": ("STRING", {"default": "output/finetuned_model", "multiline": False}),
                 "epochs": ("INT", {"default": 10, "min": 1, "max": 1000}),
                 "batch_size": ("INT", {"default": 2, "min": 1, "max": 64}),
@@ -606,7 +700,20 @@ class Qwen3FineTune:
     FUNCTION = "train"
     CATEGORY = "Qwen3-TTS/FineTuning"
 
-    def train(self, train_jsonl, init_model, output_dir, epochs, batch_size, lr, speaker_name, mixed_precision):
+    def train(self, train_jsonl, init_model, source, output_dir, epochs, batch_size, lr, speaker_name, mixed_precision):
+        # Resolve init_model path - check ComfyUI folder first, download if needed
+        if init_model in QWEN3_TTS_MODELS:
+            local_path = get_local_model_path(init_model)
+            if os.path.exists(local_path) and os.listdir(local_path):
+                init_model_path = local_path
+                print(f"Using model from ComfyUI folder: {init_model_path}")
+            else:
+                print(f"Base model not found locally. Downloading {init_model}...")
+                init_model_path = download_model_to_comfyui(init_model, source)
+        else:
+            # Assume it's a path
+            init_model_path = init_model
+        
         # Setup output directory
         full_output_dir = os.path.abspath(output_dir)
         os.makedirs(full_output_dir, exist_ok=True)
@@ -619,7 +726,7 @@ class Qwen3FineTune:
                 use_cpu = mm.cpu_mode()
                 accelerator = Accelerator(gradient_accumulation_steps=4, mixed_precision=mixed_precision, cpu=use_cpu)
                 
-                print(f"Loading base model: {init_model}")
+                print(f"Loading base model: {init_model_path}")
                 
                 attn_impl = "sdpa"
                 try:
@@ -633,7 +740,7 @@ class Qwen3FineTune:
                 dtype = torch.bfloat16 if mixed_precision == "bf16" else torch.float16 if mixed_precision == "fp16" else torch.float32
 
                 qwen3tts = Qwen3TTSModel.from_pretrained(
-                    init_model,
+                    init_model_path,
                     torch_dtype=dtype,
                     attn_implementation=attn_impl,
                 )
@@ -643,7 +750,7 @@ class Qwen3FineTune:
                 for name, param in qwen3tts.model.named_parameters():
                     param.requires_grad = True
                 
-                config = AutoConfig.from_pretrained(init_model)
+                config = AutoConfig.from_pretrained(init_model_path)
                 
                 # Load Data
                 with open(train_jsonl, 'r', encoding='utf-8') as f:
@@ -771,14 +878,14 @@ class Qwen3FineTune:
                 # Save speech tokenizer which is required for loading
                 # Try to copy it from the source model location
                 st_source = None
-                if os.path.isdir(init_model):
-                     local_st = os.path.join(init_model, "speech_tokenizer")
+                if os.path.isdir(init_model_path):
+                     local_st = os.path.join(init_model_path, "speech_tokenizer")
                      if os.path.isdir(local_st):
                          st_source = local_st
                 else:
                     # Try HF Cache
                     try:
-                        st_config = cached_file(init_model, "speech_tokenizer/config.json")
+                        st_config = cached_file(init_model_path, "speech_tokenizer/config.json")
                         if st_config:
                             st_source = os.path.dirname(st_config)
                     except:
@@ -795,13 +902,13 @@ class Qwen3FineTune:
 
                 # Copy generation_config.json if it exists in source
                 gen_config_source = None
-                if os.path.isdir(init_model):
-                    local_gen = os.path.join(init_model, "generation_config.json")
+                if os.path.isdir(init_model_path):
+                    local_gen = os.path.join(init_model_path, "generation_config.json")
                     if os.path.exists(local_gen):
                         gen_config_source = local_gen
                 else:
                     try:
-                        gen_config_source = cached_file(init_model, "generation_config.json")
+                        gen_config_source = cached_file(init_model_path, "generation_config.json")
                     except:
                         pass
                 

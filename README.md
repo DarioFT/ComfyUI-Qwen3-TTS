@@ -11,7 +11,8 @@ A ComfyUI custom node suite for [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS)
 
 ## Features
 
-- **Auto-Download Models**: Automatically downloads models from HuggingFace (or ModelScope) if not present.
+- **ComfyUI Model Folder Integration**: Models are stored in `ComfyUI/models/Qwen3-TTS/`, keeping your models organized alongside other ComfyUI models.
+- **On-Demand Download**: Only downloads the model you select—no need to pre-download all variants.
 - **Full Qwen3-TTS Support**:
   - **Custom Voice**: Use 9 preset high-quality voices (Vivian, Ryan, etc.).
   - **Voice Design**: Create new voices using natural language descriptions.
@@ -45,6 +46,23 @@ A ComfyUI custom node suite for [Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS)
 
     > ⚠️ **Dependency Note**: The upstream `qwen-tts` package requires `transformers==4.57.3`. This may downgrade your existing transformers version. If other custom nodes require a newer version, consider using a separate Python environment.
 
+## Model Storage
+
+Models and tokenizers are automatically stored in your ComfyUI models folder:
+```
+ComfyUI/models/Qwen3-TTS/
+├── Qwen3-TTS-12Hz-1.7B-CustomVoice/
+├── Qwen3-TTS-12Hz-1.7B-VoiceDesign/
+├── Qwen3-TTS-12Hz-1.7B-Base/
+├── Qwen3-TTS-12Hz-0.6B-CustomVoice/
+├── Qwen3-TTS-12Hz-0.6B-Base/
+└── Qwen3-TTS-Tokenizer-12Hz/          # For fine-tuning
+```
+
+**First-time use**: When you first select a model and run the workflow, it will be downloaded automatically. Only the model you select is downloaded—not all variants.
+
+**Existing cached models**: If you previously used this extension and have models in HuggingFace (`~/.cache/huggingface/hub/`) or ModelScope (`~/.cache/modelscope/hub/`) cache, they will be automatically migrated to the ComfyUI models folder.
+
 ## Usage
 
 ### 1. Load Model
@@ -53,7 +71,8 @@ Use the **Qwen3-TTS Loader** node.
   - `CustomVoice` models: For using preset speakers.
   - `VoiceDesign` models: For designing voices with text prompts.
   - `Base` models: For voice cloning and fine-tuning.
-- **local_model_path**: (Optional) Path to a locally trained/downloaded model.
+- **source**: Choose between HuggingFace or ModelScope for downloading (if model not already present locally).
+- **local_model_path**: (Optional) Path to a locally trained/downloaded model (overrides repo_id).
 - **attention**: Leave at `auto` for best performance (tries Flash Attention 2, falls back to SDPA).
 
 ### 2. Generate Audio
