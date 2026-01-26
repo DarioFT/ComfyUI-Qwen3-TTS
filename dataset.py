@@ -36,6 +36,8 @@ class TTSDataset(Dataset):
         self.processor = processor
         self.lag_num = lag_num
         self.config = config
+        # Cache for ref_mel - avoids redundant computation when ref_audio is the same for all samples
+        self._ref_mel_cache = {}
 
     def __len__(self):
         return len(self.data_list)
@@ -139,11 +141,15 @@ class TTSDataset(Dataset):
 
         audio_codes = torch.tensor(audio_codes, dtype=torch.long)
 
-        ref_audio_list = self._ensure_list(ref_audio_path)
-        normalized = self._normalize_audio_inputs(ref_audio_list)
-        wav,sr = normalized[0]
-
-        ref_mel = self.extract_mels(audio=wav, sr=sr)
+        # Use cached ref_mel if available (same ref_audio for all samples is recommended)
+        if ref_audio_path in self._ref_mel_cache:
+            ref_mel = self._ref_mel_cache[ref_audio_path]
+        else:
+            ref_audio_list = self._ensure_list(ref_audio_path)
+            normalized = self._normalize_audio_inputs(ref_audio_list)
+            wav, sr = normalized[0]
+            ref_mel = self.extract_mels(audio=wav, sr=sr)
+            self._ref_mel_cache[ref_audio_path] = ref_mel
 
         return {
             "text_ids": text_ids[:,:-5],    # 1 , t

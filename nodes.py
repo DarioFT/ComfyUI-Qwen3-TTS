@@ -933,7 +933,14 @@ class Qwen3FineTune:
                 dataset = TTSDataset(train_lines, qwen3tts.processor, config)
                 generator = torch.Generator()
                 generator.manual_seed(seed)
-                train_dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=dataset.collate_fn, generator=generator)
+
+                train_dataloader = DataLoader(
+                    dataset,
+                    batch_size=batch_size,
+                    shuffle=True,
+                    collate_fn=dataset.collate_fn,
+                    generator=generator,
+                )
                 
                 # Use 8-bit Adam if available and enabled (saves ~50% optimizer memory)
                 if HAS_BNB and use_8bit_optimizer:
@@ -965,19 +972,29 @@ class Qwen3FineTune:
                     )
                     print(f"Using linear warmup scheduler: {actual_warmup_steps} warmup steps out of {total_training_steps} total")
 
-                # Handle resume: restore scheduler state if available, otherwise fast-forward
-                if scheduler and resume_checkpoint_path:
-                    scheduler_state_path = os.path.join(resume_checkpoint_path, "scheduler.pt")
-                    if os.path.exists(scheduler_state_path):
-                        scheduler.load_state_dict(torch.load(scheduler_state_path, map_location="cpu"))
-                        print(f"Loaded scheduler state from {scheduler_state_path}")
+                # Handle resume: restore optimizer and scheduler state if available
+                if resume_checkpoint_path:
+                    # Load optimizer state (important for momentum/Adam statistics)
+                    optimizer_state_path = os.path.join(resume_checkpoint_path, "optimizer.pt")
+                    if os.path.exists(optimizer_state_path):
+                        optimizer.load_state_dict(torch.load(optimizer_state_path, map_location="cpu"))
+                        print(f"Loaded optimizer state from {optimizer_state_path}")
                     else:
-                        # Fast-forward scheduler to current position (for checkpoints saved before this feature)
-                        completed_steps = start_epoch * num_update_steps_per_epoch
-                        if completed_steps > 0:
-                            print(f"Fast-forwarding scheduler by {completed_steps} steps (no saved state found)")
-                            for _ in range(completed_steps):
-                                scheduler.step()
+                        print("No optimizer state found, starting fresh (momentum will be reset)")
+
+                    # Load scheduler state if using warmup
+                    if scheduler:
+                        scheduler_state_path = os.path.join(resume_checkpoint_path, "scheduler.pt")
+                        if os.path.exists(scheduler_state_path):
+                            scheduler.load_state_dict(torch.load(scheduler_state_path, map_location="cpu"))
+                            print(f"Loaded scheduler state from {scheduler_state_path}")
+                        else:
+                            # Fast-forward scheduler to current position (for checkpoints saved before this feature)
+                            completed_steps = start_epoch * num_update_steps_per_epoch
+                            if completed_steps > 0:
+                                print(f"Fast-forwarding scheduler by {completed_steps} steps (no saved state found)")
+                                for _ in range(completed_steps):
+                                    scheduler.step()
 
                 if scheduler:
                     model, optimizer, train_dataloader, scheduler = accelerator.prepare(
@@ -1116,6 +1133,9 @@ class Qwen3FineTune:
 
                     unwrapped_model_ckpt = accelerator.unwrap_model(model)
                     torch.save(unwrapped_model_ckpt.state_dict(), os.path.join(checkpoint_path, "pytorch_model.bin"))
+
+                    # Save optimizer state for resume (preserves momentum/Adam statistics)
+                    torch.save(optimizer.state_dict(), os.path.join(checkpoint_path, "optimizer.pt"))
 
                     # Save scheduler state for resume
                     if scheduler:
@@ -1299,6 +1319,9 @@ class Qwen3FineTune:
                 # Save training checkpoint (includes all weights for resume)
                 torch.save(unwrapped_model.state_dict(), os.path.join(final_output_path, "pytorch_model.bin"))
                 print(f"Saved training checkpoint: {os.path.join(final_output_path, 'pytorch_model.bin')}")
+
+                # Save optimizer state for resume (preserves momentum/Adam statistics)
+                torch.save(optimizer.state_dict(), os.path.join(final_output_path, "optimizer.pt"))
 
                 # Save scheduler state
                 if scheduler:
