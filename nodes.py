@@ -215,6 +215,7 @@ class Qwen3Loader:
             },
             "optional": {
                 "local_model_path": ("STRING", {"default": "", "multiline": False}),
+                "checkpoint_path": ("STRING", {"default": "", "multiline": False, "tooltip": "Path to checkpoint folder. Loads base model architecture, then applies checkpoint weights."}),
             }
         }
 
@@ -223,7 +224,7 @@ class Qwen3Loader:
     FUNCTION = "load_model"
     CATEGORY = "Qwen3-TTS"
 
-    def load_model(self, repo_id, source, precision, attention, local_model_path=""):
+    def load_model(self, repo_id, source, precision, attention, local_model_path="", checkpoint_path=""):
         device = mm.get_torch_device()
         
         dtype = torch.float32
@@ -279,7 +280,32 @@ class Qwen3Loader:
             dtype=dtype,
             attn_implementation=attn_impl
         )
-        
+
+        # Load checkpoint weights if provided
+        if checkpoint_path and checkpoint_path.strip():
+            ckpt_path = checkpoint_path.strip()
+            ckpt_weights = os.path.join(ckpt_path, "pytorch_model.bin")
+            if os.path.exists(ckpt_weights):
+                state_dict = torch.load(ckpt_weights, map_location="cpu")
+                model.model.load_state_dict(state_dict, strict=False)
+                print(f"Loaded checkpoint weights from {ckpt_weights}")
+            else:
+                raise ValueError(f"Checkpoint weights not found: {ckpt_weights}")
+
+            # Apply speaker mapping from checkpoint config
+            ckpt_cfg_path = os.path.join(ckpt_path, "config.json")
+            if os.path.exists(ckpt_cfg_path):
+                with open(ckpt_cfg_path, 'r', encoding='utf-8') as f:
+                    ckpt_cfg = json.load(f)
+                if "talker_config" in ckpt_cfg:
+                    talker_cfg = ckpt_cfg["talker_config"]
+                    if hasattr(model.model, 'talker') and hasattr(model.model.talker, 'config'):
+                        if "spk_id" in talker_cfg:
+                            model.model.talker.config.spk_id = talker_cfg["spk_id"]
+                        if "spk_is_dialect" in talker_cfg:
+                            model.model.talker.config.spk_is_dialect = talker_cfg["spk_is_dialect"]
+                        print(f"Applied speaker mapping: {talker_cfg.get('spk_id', {})}")
+
         # FORCE SPEAKER MAPPING FIX - Deep Injection
         try:
             cfg_file = os.path.join(model_path, "config.json")
@@ -1168,15 +1194,35 @@ class Qwen3FineTune:
                 end_epoch = start_epoch + epochs
                 print(f"Starting training from epoch {start_epoch + 1} to {end_epoch}...")
 
-                # Helper function to save a training checkpoint (minimal, for resume only)
+                # Helper function to save a training checkpoint (also inference-ready)
                 def save_training_checkpoint(checkpoint_name):
-                    """Save minimal checkpoint for resuming training. Fast and disk-efficient."""
+                    """Save checkpoint for resuming training. Also inference-ready."""
                     ckpt_path = os.path.join(full_output_dir, checkpoint_name)
                     os.makedirs(ckpt_path, exist_ok=True)
 
-                    # Save training weights
+                    # Save training weights with speaker embedding injected
                     unwrapped = accelerator.unwrap_model(model)
-                    torch.save(unwrapped.state_dict(), os.path.join(ckpt_path, "pytorch_model.bin"))
+                    state_dict = {k: v.cpu() for k, v in unwrapped.state_dict().items()}
+
+                    # Inject speaker embedding at index 3000 (for inference)
+                    if target_speaker_embedding is not None:
+                        weight = state_dict['talker.model.codec_embedding.weight']
+                        state_dict['talker.model.codec_embedding.weight'][3000] = target_speaker_embedding[0].detach().cpu().to(weight.dtype)
+
+                    torch.save(state_dict, os.path.join(ckpt_path, "pytorch_model.bin"))
+
+                    # Save config for inference (speaker mapping)
+                    base_cfg_path = os.path.join(init_model_path, "config.json")
+                    with open(base_cfg_path, 'r', encoding='utf-8') as f:
+                        ckpt_cfg = json.load(f)
+
+                    ckpt_cfg["tts_model_type"] = "custom_voice"
+                    spk_key = speaker_name.lower()
+                    ckpt_cfg["talker_config"]["spk_id"] = {spk_key: 3000}
+                    ckpt_cfg["talker_config"]["spk_is_dialect"] = {spk_key: False}
+
+                    with open(os.path.join(ckpt_path, "config.json"), 'w', encoding='utf-8') as f:
+                        json.dump(ckpt_cfg, f, indent=2, ensure_ascii=False)
 
                     # Save optimizer state for resume
                     torch.save(optimizer.state_dict(), os.path.join(ckpt_path, "optimizer.pt"))
