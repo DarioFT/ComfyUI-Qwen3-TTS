@@ -1134,19 +1134,10 @@ class Qwen3FineTune:
                 torch.cuda.empty_cache()
 
                 use_cpu = mm.cpu_mode()
-                num_gpus = torch.cuda.device_count()
-                if num_gpus <= 1 or use_cpu:
-                    os.environ.setdefault("RANK", "0")
-                    os.environ.setdefault("WORLD_SIZE", "1")
-                    os.environ.setdefault("LOCAL_RANK", "0")
-                    os.environ.setdefault("MASTER_ADDR", "localhost")
-                    os.environ.setdefault("MASTER_PORT", "29500")
-                else:
-                    for key in ["RANK", "WORLD_SIZE", "LOCAL_RANK"]:
-                        os.environ.pop(key, None)
-                    os.environ.setdefault("MASTER_ADDR", "localhost")
-                    os.environ.setdefault("MASTER_PORT", "29500")
-                    print(f"Multi-GPU training enabled: {num_gpus} GPUs detected")
+                # Force single-process training mode by clearing distributed env vars.
+                # This prevents NCCL init on Windows and "RANK expected" errors from stale env vars.
+                for key in ["RANK", "WORLD_SIZE", "LOCAL_RANK", "MASTER_ADDR", "MASTER_PORT"]:
+                    os.environ.pop(key, None)
 
                 # Check GPU bf16 support and fallback to fp32 if needed
                 actual_mixed_precision = mixed_precision
