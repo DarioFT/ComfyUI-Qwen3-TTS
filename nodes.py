@@ -1484,7 +1484,7 @@ class Qwen3FineTune:
                             
                             sub_talker_logits, sub_talker_loss = current_model.talker.forward_sub_talker_finetune(talker_codec_ids, talker_hidden_states)
                             
-                            loss = outputs.loss + sub_talker_loss
+                            loss = outputs.loss + 0.3 * sub_talker_loss
                             
                             if steps == 0 and epoch == start_epoch:
                                 print(f"DEBUG: Loss requires_grad: {loss.requires_grad}")
